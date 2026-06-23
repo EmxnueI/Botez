@@ -31,7 +31,7 @@ img{max-width:100%;height:auto}
  * delta + streak), lift PR ticker, composition phase card,
  * progress photos. Vanilla CSS+JS, localStorage.
  * Weight log + photos are fully interactive. Lifts + composition
- * are seeded demo (they read your workout logs in the hosted app).
+ * read your real workout logs from the Gym app (po_coach_v1).
  * ============================================================ */
 :root{
   color-scheme:dark;
@@ -238,7 +238,6 @@ body{background:var(--bg);color:var(--fg);font-family:var(--font-inter),-apple-s
 <input id="fileInput" type="file" accept="image/*" class="hiddenInput" />
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="db.js?v=15"></script>
-<script src="cloud-sync.js?v=15"></script>
 <script>
 /* ===================== Helpers ===================== */
 function getLocalDateKey(d){d=d||new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
@@ -258,17 +257,78 @@ function compress(dataUrl,maxDim,q){return new Promise(res=>{const img=new Image
 
 const CHART_WINDOW=30,AVG_WINDOW=7;
 
-/* ===================== Static demo data (workout-fed in hosted app) ===================== */
-const LIFTS=[
-  {id:'l1',exerciseName:'Barbell bench',kind:'pr_reps',currentReps:7,previousReps:5,currentWeightKg:85,previousWeightKg:85},
-  {id:'l2',exerciseName:'Barbell bench',kind:'pr_weight',currentWeightKg:85,previousWeightKg:80,currentReps:5,previousReps:5},
-  {id:'l3',exerciseName:'Back squat',kind:'pr_weight',currentWeightKg:120,previousWeightKg:115,currentReps:5,previousReps:5},
-  {id:'l4',exerciseName:'Deadlift',kind:'pr_reps',currentReps:6,previousReps:4,currentWeightKg:140,previousWeightKg:140},
-  {id:'l5',exerciseName:'Overhead press',kind:'regress_weight',currentWeightKg:50,previousWeightKg:55,currentReps:5,previousReps:5},
-];
-const COMPOSITION={phase:'recomp',weightSlopeKgPerWeek:0,volumeTrendPct:143,estimatedLeanKgPerWeek:null,estimatedFatKgPerWeek:null,windowDays:28,confidence:30};
+/* ============ Real training data, read from the Gym app (po_coach_v1) ============ */
 const PHASE_LABEL={recomp:'Recomping',bulking:'Bulking',fat_gain:'Fat gain',cutting:'Cutting',losing:'Losing both',holding:'Holding',insufficient:'Calibrating'};
 const PHASE_SUB={recomp:'lifts up, weight steady, likely swapping fat for muscle',bulking:'weight up, lifts up. the gains are mostly muscle',fat_gain:'weight up, lifts flat. most of the gain is fat',cutting:'weight down, lifts preserved. fat loss with muscle held',losing:'weight down, lifts down. losing both',holding:'weight + lifts both steady. maintenance phase',insufficient:'log a few more weeks of weight + training to unlock this'};
+
+function readGymState(){try{const r=localStorage.getItem('po_coach_v1');return r?JSON.parse(r):null;}catch{return null;}}
+function gymUnits(g){return (g&&g.units)||'kg';}
+function est1RM(w,r){return r<2?w:w*(1+r/30);}
+function gymWeightToKg(w,gu){return gu==='lb'?(w/2.20462):w;}
+
+// Per-exercise progress over the last 90 days, computed from the Gym app's real
+// logs: state.logs[exId] = [{weight, reps, date(ISO)}]. We take the top set of
+// each training day, then compare the most-recent day to the prior best.
+function computeLifts(){
+  const g=readGymState();
+  if(!g||!Array.isArray(g.exercises)||!g.logs)return [];
+  const gu=gymUnits(g),now=Date.now(),WINDOW=90*864e5,out=[];
+  g.exercises.forEach(ex=>{
+    const logs=(g.logs[ex.id]||[]).filter(l=>l&&l.date&&(now-new Date(l.date).getTime())<=WINDOW);
+    if(logs.length<2)return;
+    const metric=l=>ex.bw?(l.reps||0):est1RM(l.weight||0,l.reps||0);
+    const byDay={};
+    logs.forEach(l=>{const k=String(l.date).slice(0,10);if(!byDay[k]||metric(l)>metric(byDay[k]))byDay[k]=l;});
+    const days=Object.keys(byDay).sort();
+    if(days.length<2)return;
+    const cur=byDay[days[days.length-1]];
+    let prev=byDay[days[0]];
+    for(let i=1;i<days.length-1;i++){if(metric(byDay[days[i]])>metric(prev))prev=byDay[days[i]];}
+    const cm=metric(cur),pm=metric(prev);
+    let kind;
+    if(cm>pm)kind=ex.bw?'pr_reps':(cur.weight>prev.weight?'pr_weight':'pr_reps');
+    else if(cm<pm)kind='regress_weight';
+    else return; // unchanged top set → no news
+    out.push({id:ex.id,exerciseName:ex.name||'Lift',kind,
+      currentWeightKg:gymWeightToKg(cur.weight||0,gu),previousWeightKg:gymWeightToKg(prev.weight||0,gu),
+      currentReps:cur.reps||0,previousReps:prev.reps||0});
+  });
+  return out;
+}
+
+// Body-composition read: training-volume trend (Gym, last 14d vs prior 14d) +
+// weight slope (this page's own weight log). Returns null when there's no real
+// Gym data yet so the caller can hide the section instead of faking it.
+function computeComposition(){
+  const g=readGymState();
+  let hasGym=false,volTrend=null;
+  if(g&&g.logs){
+    const now=Date.now(),H=14*864e5;let recentVol=0,priorVol=0;
+    Object.keys(g.logs).forEach(id=>{(g.logs[id]||[]).forEach(l=>{
+      if(!l||!l.date)return;const age=now-new Date(l.date).getTime();
+      const vol=(l.weight||0)*(l.reps||0)||(l.reps||0);
+      if(age<=H){recentVol+=vol;hasGym=true;}else if(age<=2*H){priorVol+=vol;hasGym=true;}
+    });});
+    if(priorVol>0)volTrend=((recentVol-priorVol)/priorVol)*100;
+  }
+  if(!hasGym)return null;
+  const now=Date.now(),W=28*864e5,s=sortedEntries().filter(e=>(now-parseKey(e.dateKey).getTime())<=W);
+  let weightSlope=null;
+  if(s.length>=2){const first=s[0],last=s[s.length-1];const days=(parseKey(last.dateKey)-parseKey(first.dateKey))/864e5;if(days>=1)weightSlope=(last.weightKg-first.weightKg)/(days/7);}
+  const wUp=weightSlope!=null&&weightSlope>0.15,wDown=weightSlope!=null&&weightSlope<-0.15;
+  const lUp=volTrend!=null&&volTrend>3,lDown=volTrend!=null&&volTrend<-3;
+  let phase;
+  if(weightSlope==null||volTrend==null)phase='insufficient';
+  else if(!wUp&&!wDown&&lUp)phase='recomp';
+  else if(wUp&&lUp)phase='bulking';
+  else if(wUp&&!lUp&&!lDown)phase='fat_gain';
+  else if(wDown&&!lDown)phase='cutting';
+  else if(wDown&&lDown)phase='losing';
+  else phase='holding';
+  const conf=Math.min(90,(s.length*8)+(hasGym?30:0));
+  return {phase,weightSlopeKgPerWeek:weightSlope||0,volumeTrendPct:volTrend,
+    estimatedLeanKgPerWeek:null,estimatedFatKgPerWeek:null,windowDays:28,confidence:conf};
+}
 
 /* ===================== State ===================== */
 const LS='progress_standalone_v1',PHOTOS='progress_standalone_photos_v1';
@@ -366,13 +426,16 @@ function liftItem(s){
   return '<span class="tickerItem '+(isPR?'tickerItemUp':'tickerItemDown')+'"><span class="tickerArrow">'+arrow+'</span><span class="tickerName">'+esc(s.exerciseName)+'</span><span class="tickerSep">·</span><span class="tickerBody">'+body+'</span></span>';
 }
 function trainingHtml(){
-  if(!LIFTS.length)return '';
-  const items=LIFTS.map(s=>liftItem(s)).join('');
+  const lifts=computeLifts();
+  if(!lifts.length)return ''; // no real Gym lift data yet → hide the section
+  const items=lifts.map(s=>liftItem(s)).join('');
   return '<section class="section"><div class="sectionEyebrow">training · last 90 days</div>'
     +'<div class="ticker"><div class="tickerBadge"><span class="tickerBadgeDot"></span>lifts</div><div class="tickerViewport"><div class="tickerTrack">'+items+items+'</div></div></div></section>';
 }
 function compHtml(){
-  const c=COMPOSITION,u=state.units;
+  const c=computeComposition();
+  if(!c)return ''; // no real Gym data yet → hide instead of showing sample numbers
+  const u=state.units;
   const wDisp=kgToDisplay(c.weightSlopeKgPerWeek,u);
   const lean=c.estimatedLeanKgPerWeek==null?null:kgToDisplay(c.estimatedLeanKgPerWeek,u);
   const fat=c.estimatedFatKgPerWeek==null?null:kgToDisplay(c.estimatedFatKgPerWeek,u);
@@ -389,7 +452,7 @@ function compHtml(){
     +'<div class="compCard"><div><span class="compPhaseWord">'+PHASE_LABEL[c.phase]+'</span></div><p class="compPhaseSub">'+PHASE_SUB[c.phase]+'</p>'
     +(c.phase!=='insufficient'?'<div class="compPillRow">'+pillHtml+'</div>':'')
     +'<p class="compCaveat">estimate · not a body-fat measurement'+(c.confidence<35?' · low data':'')+'</p></div>'
-    +'<p class="noteLine">Lifts + composition read from your workout logs in the hosted app — shown here as a sample.</p></section>';
+    +'<p class="noteLine">Lifts + composition are read from your real workout logs in the Gym app + your weight log.</p></section>';
 }
 
 /* ===================== Render: photos ===================== */

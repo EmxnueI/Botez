@@ -113,6 +113,8 @@ body { background: var(--bg); color: var(--fg); font-family: var(--font-ui), -ap
 .profileChip:hover { border-color: var(--brand-line); background: var(--brand-soft); }
 .profileChipNew { padding: 7px 14px; color: var(--brand); border-color: var(--brand-line); background: var(--brand-soft); }
 .profileAvatar { display:grid; place-items:center; width: 22px; height: 22px; border-radius: 50%; background: var(--brand); color: var(--brand-ink); font-family: var(--font-display); font-weight: 700; font-size: 12px; }
+.gearBtn { appearance:none; display:grid; place-items:center; width: 32px; height: 32px; background: var(--surface); border: 1px solid var(--border); border-radius: 50%; color: var(--muted-strong); font-size: 15px; line-height: 1; cursor: pointer; transition: border-color var(--duration) var(--ease-premium), background var(--duration) var(--ease-premium), color var(--duration) var(--ease-premium); }
+.gearBtn:hover { border-color: var(--brand-line); background: var(--brand-soft); color: var(--fg); }
 
 /* Daily reminders */
 .reminders { display:flex; align-items:center; flex-wrap:wrap; gap: var(--space-2); margin-bottom: var(--space-5); }
@@ -383,7 +385,9 @@ function headerHtml(){
     ? '<button type="button" class="profileChip" data-action="open-profile" title="Edit your profile"><span class="profileAvatar">' + esc((name || '·').charAt(0).toUpperCase()) + '</span>' + esc(name || 'Profile') + '</button>'
     : '<button type="button" class="profileChip profileChipNew" data-action="open-profile">Set up profile</button>';
   return '<header class="header"><div><h1 class="title">Emanuel</h1><p class="subtitle">' + greeting + '</p></div>'
-    + '<div class="headerControls">' + themeSegHtml() + chip + '</div></header>';
+    + '<div class="headerControls">' + themeSegHtml() + chip
+    + '<button type="button" class="gearBtn" data-action="open-profile" title="Settings" aria-label="Edit profile &amp; settings">⚙</button>'
+    + '</div></header>';
 }
 
 function vitalsTileHtml(){
@@ -751,7 +755,10 @@ window.addEventListener('storage', e => {
   if (e.key === HEALTH_KEY || e.key === LEGACY_WHOOP_KEY || e.key === null) { health = loadHealth(); render(); }
 });
 
-if (!profile) { ui.profileDraft = draftFromProfile(); ui.profileOpen = true; } // first run → onboarding prompt (init draft so typing is captured)
+// First run ONLY: auto-open onboarding when there's no saved+completed profile.
+// Once a profile exists with onboarded:true we never auto-open again — the user
+// reaches it on demand via the ⚙ settings gear / profile chip in the header.
+if (!profile || !profile.onboarded) { ui.profileDraft = draftFromProfile(); ui.profileOpen = true; }
 applyTheme(currentTheme);
 
 // On a deployed host: pick up the OAuth return + pull the latest Whoop / Fitbit vitals.
@@ -772,6 +779,5 @@ applyTheme(currentTheme);
 </script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="db.js?v=15"></script>
-<script src="cloud-sync.js?v=15"></script>
 </body>
 </html>
