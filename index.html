@@ -250,6 +250,7 @@ body { background: var(--bg); color: var(--fg); font-family: var(--font-ui), -ap
 .howtoChip { display:inline-block; padding: 3px 9px; border-radius: var(--radius-pill); background: var(--surface-2); border: 1px solid var(--border); font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.04em; color: var(--fg); }
 .howtoFoot { margin: var(--space-3) 0 0; font-size: 11px; line-height: 1.5; color: var(--muted); }
 </style>
+<link rel="stylesheet" href="polish.css?v=1">
 </head>
 <body>
 <main class="page grain-overlay">
@@ -262,6 +263,7 @@ body { background: var(--bg); color: var(--fg); font-family: var(--font-ui), -ap
  * ============================================================ */
 const APPS = [
   { file: 'finance.html',     name: 'Finance',     tag: 'Net worth · subs · orders · wishlist', icon: '💰', wide: true },
+  { file: 'money.html',       name: 'Money & Tax', tag: 'Debts · BTW/VAT · invoices · accountant', icon: '🧾', wide: true },
   { file: 'gym.html',         name: 'Gym',         tag: 'Progressive overload coach',           icon: '🏋️', wide: true },
   { file: 'supplements.html', name: 'Supplements', tag: 'Your stack + smart recommendations',   icon: '💊' },
   { file: 'whoop.html',       name: 'Fitness Band', tag: 'Whoop · Fitbit · Apple Watch sync',      icon: '🔋' },
@@ -430,6 +432,7 @@ function statFor(file){
     if (file === 'finance.html') { const s = lsGet('finance_standalone_v1'); if (s && Array.isArray(s.accounts) && s.accounts.length) { const nw = s.accounts.reduce((a,x)=>a+(Number(x.amountCHF)||0),0); return { value: 'CHF ' + fmtNum(nw), label: 'net worth' }; } }
     else if (file === 'supplements.html') { const s = lsGet('supplements_standalone_v1'); if (s && Array.isArray(s.items) && s.items.length) { const tk = (s.taken && s.taken[activeDateKey()]) || {}; const n = s.items.filter(i => tk[i.id]).length; return { value: n + '/' + s.items.length, label: 'taken today' }; } }
     else if (file === 'water.html') { const s = lsGet('water_standalone_v1'); if (s && s.logs) { const n = s.logs[localDateKey()] || 0; return { value: String(n), label: (n === 1 ? 'drink' : 'drinks') + ' today' }; } }
+    else if (file === 'money.html') { const s = lsGet('money_standalone_v1'); if (s && Array.isArray(s.debts) && s.debts.length) { const owed = s.debts.reduce((a,x)=>a+(Number(x.balance)||0),0); return { value: '€' + fmtNum(owed), label: 'owed' }; } }
     else if (file === 'whoop.html') { if (health && health.recovery != null) return { value: Math.round(health.recovery) + '%', label: 'recovery' }; }
   } catch (e) {}
   return null;

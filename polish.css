@@ -1,0 +1,75 @@
+/* ============================================================
+ * polish.css — suite-wide UI/UX polish layer.
+ *
+ * Additive ONLY. No layout/structure changes — just the details
+ * that make the suite feel premium: accessible focus rings, smooth
+ * transitions, refined scrollbars, tasteful selection, tactile
+ * press feedback, and a gentle page entrance. Theme-agnostic:
+ * every colour falls back to a sane default, so it layers cleanly
+ * on top of each page's own styles and all three themes.
+ *
+ * Linked last in <head> on every page. Honors prefers-reduced-motion.
+ * ============================================================ */
+
+/* ---- Gentle, opacity-only page entrance (safe for fixed/modal layers) ---- */
+@media (prefers-reduced-motion: no-preference) {
+  html { scroll-behavior: smooth; }
+  body { animation: polishFadeIn 0.45s cubic-bezier(0.16, 1, 0.3, 1) both; }
+  @keyframes polishFadeIn { from { opacity: 0; } to { opacity: 1; } }
+}
+
+/* ---- Accessible, premium focus ring (keyboard navigation only) ---- */
+:focus-visible {
+  outline: 2px solid var(--brand, #8B7CFF);
+  outline-offset: 2px;
+  border-radius: 5px;
+}
+/* Mouse/touch interactions shouldn't show the ring on controls that
+   already paint their own focus state. */
+a:focus:not(:focus-visible),
+button:focus:not(:focus-visible),
+input:focus:not(:focus-visible),
+select:focus:not(:focus-visible),
+textarea:focus:not(:focus-visible) { outline: none; }
+
+/* ---- Tasteful text selection ---- */
+::selection { background: var(--brand, #8B7CFF); color: #fff; text-shadow: none; }
+
+/* ---- Caret matches the brand ---- */
+input, textarea { caret-color: var(--brand, #8B7CFF); }
+
+/* ---- Refined, unobtrusive scrollbars ---- */
+* { scrollbar-width: thin; scrollbar-color: var(--border-strong, rgba(255,255,255,0.2)) transparent; }
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: var(--border-strong, rgba(255,255,255,0.18));
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+  transition: background 0.2s ease;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--brand-line, rgba(139,124,255,0.45));
+  background-clip: padding-box;
+}
+
+/* ---- Kill the grey mobile tap flash on interactive elements ---- */
+a, button, [role="button"], summary, label, input, select, textarea {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* ---- Tactile press feedback (pointer devices, motion allowed) ---- */
+@media (prefers-reduced-motion: no-preference) and (hover: hover) {
+  button:not(:disabled):active,
+  .btn:not(:disabled):active,
+  a[class]:active,
+  [role="button"]:active {
+    transform: scale(0.975);
+  }
+}
+
+/* ---- Smoother disabled affordance everywhere ---- */
+button:disabled, .btn:disabled, [aria-disabled="true"] {
+  cursor: not-allowed;
+}
