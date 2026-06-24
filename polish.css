@@ -1,21 +1,48 @@
 /* ============================================================
  * polish.css — suite-wide UI/UX polish layer.
  *
- * Additive ONLY. No layout/structure changes — just the details
- * that make the suite feel premium: accessible focus rings, smooth
- * transitions, refined scrollbars, tasteful selection, tactile
- * press feedback, and a gentle page entrance. Theme-agnostic:
- * every colour falls back to a sane default, so it layers cleanly
- * on top of each page's own styles and all three themes.
- *
- * Linked last in <head> on every page. Honors prefers-reduced-motion.
+ * Additive ONLY (no layout/structure changes). Tuned to be
+ * VISIBLE on touch devices too, not just desktop:
+ *   - clear page slide-up + fade on load
+ *   - real press-depress on anything you tap (works on touch)
+ *   - accessible focus rings, smooth scroll, refined scrollbars,
+ *     brand selection + caret.
+ * Theme-agnostic (every colour has a fallback). Honors
+ * prefers-reduced-motion. Linked last in <head> on every page.
  * ============================================================ */
 
-/* ---- Gentle, opacity-only page entrance (safe for fixed/modal layers) ---- */
+/* ---- Page entrance: the main content wrapper slides up + fades in ---- */
 @media (prefers-reduced-motion: no-preference) {
   html { scroll-behavior: smooth; }
-  body { animation: polishFadeIn 0.45s cubic-bezier(0.16, 1, 0.3, 1) both; }
-  @keyframes polishFadeIn { from { opacity: 0; } to { opacity: 1; } }
+  .shell, .po-shell, #app, main {
+    animation: polishRise 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+  @keyframes polishRise {
+    from { opacity: 0; transform: translateY(18px); }
+    to   { opacity: 1; transform: none; }
+  }
+}
+
+/* ---- Tactile press feedback — works on touch AND mouse ---- */
+button:not(:disabled):active,
+.btn:not(:disabled):active,
+a:active,
+[role="button"]:active,
+.card:active,
+label:active {
+  transform: scale(0.97);
+}
+button, .btn, a, [role="button"], .card, label, .themeBtn, .unitBtn {
+  transition: transform 140ms cubic-bezier(0.16, 1, 0.3, 1),
+              filter 140ms ease,
+              box-shadow 200ms ease;
+}
+
+/* ---- Hover lift on pointer devices (won't affect touch) ---- */
+@media (hover: hover) {
+  a.card:hover, .card:hover {
+    transform: translateY(-2px);
+  }
 }
 
 /* ---- Accessible, premium focus ring (keyboard navigation only) ---- */
@@ -24,52 +51,29 @@
   outline-offset: 2px;
   border-radius: 5px;
 }
-/* Mouse/touch interactions shouldn't show the ring on controls that
-   already paint their own focus state. */
 a:focus:not(:focus-visible),
 button:focus:not(:focus-visible),
 input:focus:not(:focus-visible),
 select:focus:not(:focus-visible),
 textarea:focus:not(:focus-visible) { outline: none; }
 
-/* ---- Tasteful text selection ---- */
+/* ---- Tasteful text selection + brand caret ---- */
 ::selection { background: var(--brand, #8B7CFF); color: #fff; text-shadow: none; }
-
-/* ---- Caret matches the brand ---- */
 input, textarea { caret-color: var(--brand, #8B7CFF); }
 
-/* ---- Refined, unobtrusive scrollbars ---- */
+/* ---- Refined, unobtrusive scrollbars (desktop) ---- */
 * { scrollbar-width: thin; scrollbar-color: var(--border-strong, rgba(255,255,255,0.2)) transparent; }
 ::-webkit-scrollbar { width: 10px; height: 10px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb {
   background: var(--border-strong, rgba(255,255,255,0.18));
-  border-radius: 999px;
-  border: 2px solid transparent;
-  background-clip: padding-box;
-  transition: background 0.2s ease;
+  border-radius: 999px; border: 2px solid transparent; background-clip: padding-box;
 }
-::-webkit-scrollbar-thumb:hover {
-  background: var(--brand-line, rgba(139,124,255,0.45));
-  background-clip: padding-box;
-}
+::-webkit-scrollbar-thumb:hover { background: var(--brand-line, rgba(139,124,255,0.45)); background-clip: padding-box; }
 
-/* ---- Kill the grey mobile tap flash on interactive elements ---- */
+/* ---- Kill the grey mobile tap flash ---- */
 a, button, [role="button"], summary, label, input, select, textarea {
   -webkit-tap-highlight-color: transparent;
 }
 
-/* ---- Tactile press feedback (pointer devices, motion allowed) ---- */
-@media (prefers-reduced-motion: no-preference) and (hover: hover) {
-  button:not(:disabled):active,
-  .btn:not(:disabled):active,
-  a[class]:active,
-  [role="button"]:active {
-    transform: scale(0.975);
-  }
-}
-
-/* ---- Smoother disabled affordance everywhere ---- */
-button:disabled, .btn:disabled, [aria-disabled="true"] {
-  cursor: not-allowed;
-}
+button:disabled, .btn:disabled, [aria-disabled="true"] { cursor: not-allowed; }
